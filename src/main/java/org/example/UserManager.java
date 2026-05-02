@@ -1,84 +1,87 @@
 package org.example;
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
 
-/**
- * Handles reading and writing user data to/from users.txt.
- * Each line format: username|password|email
- */
+import java.sql.*;
+
 public class UserManager {
 
-    private static final String FILE_NAME = "users.txt";
-    private static final String SEPARATOR = "|";
+    private static final String DB_URL = "jdbc:sqlite:library.db";
 
-    /**
-     * Attempts to log in with the given credentials.
-     * Returns the username string on success, or null on failure.
-     */
+    static {
+        initDatabase();
+    }
+
+    private static Connection connect() throws SQLException {
+        return DriverManager.getConnection(DB_URL);
+    }
+
+    private static void initDatabase() {
+        String sql = """
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password TEXT NOT NULL,
+                email    TEXT NOT NULL UNIQUE,
+                role     TEXT NOT NULL
+            )""";
+        try (Connection conn = connect(); Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+        } catch (SQLException e) {
+            System.out.println("UserManager DB init error: " + e.getMessage());
+        }
+    }
+
+    // ── Login ─────────────────────────────────────────────────
+
     public static String[] login(String username, String password) {
-        List<String[]> users = readAllUsers();
-        for (String[] user : users) {
-            if (user[0].equalsIgnoreCase(username) && user[1].equals(password)) {
-                return new String[]{user[0], user[3]}; // username + role
+        String sql = "SELECT username, role FROM users WHERE LOWER(username) = LOWER(?) AND password = ?";
+
+        try (Connection conn = connect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, username);
+            ps.setString(2, password);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                return new String[]{rs.getString("username"), rs.getString("role")};
             }
+        } catch (SQLException e) {
+            System.out.println("Login error: " + e.getMessage());
         }
         return null;
     }
 
-    /**
-     * Attempts to register a new user.
-     * Returns null on success, or an error message string on failure.
-     */
+    // ── Register ──────────────────────────────────────────────
+
     public static String register(String username, String email, String password, String role) {
-        List<String[]> users = readAllUsers();
+        // Check for duplicate username
+        String checkUser  = "SELECT username FROM users WHERE LOWER(username) = LOWER(?)";
+        String checkEmail = "SELECT email FROM users WHERE LOWER(email) = LOWER(?)";
 
-        // Check for duplicate username or email (case-insensitive)
-        for (String[] user : users) {
-            if (user[0].equalsIgnoreCase(username)) {
-                return "Username already exists. Please choose a different one.";
-            }
-            if (user[2].equalsIgnoreCase(email)) {
-                return "An account with that email already exists.";
-            }
-        }
+        try (Connection conn = connect()) {
 
-        // Append new user to file
-        try (PrintWriter pw = new PrintWriter(new FileWriter(FILE_NAME, true))) {
-            pw.println(username + SEPARATOR + password + SEPARATOR + email + SEPARATOR + role);
+            try (PreparedStatement ps = conn.prepareStatement(checkUser)) {
+                ps.setString(1, username);
+                if (ps.executeQuery().next()) return "Username already exists. Please choose a different one.";
+            }
+
+            try (PreparedStatement ps = conn.prepareStatement(checkEmail)) {
+                ps.setString(1, email);
+                if (ps.executeQuery().next()) return "An account with that email already exists.";
+            }
+
+            String sql = "INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, username);
+                ps.setString(2, password);
+                ps.setString(3, email);
+                ps.setString(4, role);
+                ps.executeUpdate();
+            }
+
             return null; // success
-        } catch (IOException e) {
+
+        } catch (SQLException e) {
             return "Error saving user data: " + e.getMessage();
         }
-    }
-
-    /**
-     * Reads all users from users.txt and returns them as a list of String arrays.
-     * Each array: [username, password, email]
-     */
-    private static List<String[]> readAllUsers() {
-        List<String[]> users = new ArrayList<>();
-        File file = new File(FILE_NAME);
-        if (!file.exists()) return users;
-
-        try (Scanner scanner = new Scanner(file)) {
-            while (scanner.hasNextLine()) {
-                String line = scanner.nextLine().trim();
-                if (line.isEmpty()) continue;
-                String[] parts = line.split("\\|", -1);
-                if (parts.length == 4) {
-                    users.add(new String[]{
-                        parts[0].trim(),
-                        parts[1].trim(),
-                        parts[2].trim(),
-                        parts[3].trim()
-                    });
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("Error reading users.txt: " + e.getMessage());
-        }
-        return users;
     }
 }

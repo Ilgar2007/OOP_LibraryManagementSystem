@@ -10,12 +10,11 @@ import java.util.List;
 
 public class LibraryData {
 
-    // ── JDBC setup
-    // SQLite creates "library.db" in the project root automatically.
+
     private static final String DB_URL = "jdbc:sqlite:library.db";
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
-    // ── Singleton
+
     private static LibraryData instance;
 
     private Catalog catalog;
@@ -27,8 +26,8 @@ public class LibraryData {
         this.books   = new ArrayList<>();
         this.members = new ArrayList<>();
 
-        initDatabase();   // create tables if they don't exist
-        loadBooks();      // read rows → in-memory list
+        initDatabase();
+        loadBooks();
         loadMembers();
 
         if (books.isEmpty()) {

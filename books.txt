@@ -1,6 +1,0 @@
-BC001|978-0-7432-7356-5|Harry Potter|Fantasy|Bloomsbury|English|500|19.99|HARDCOVER|AVAILABLE|false|2026-04-21|2026-04-21|J.K. Rowling
-BC002|978-0-452-28423-4|1984|Dystopian|Secker and Warburg|English|328|14.99|PAPERBACK|AVAILABLE|false|2026-04-21|2026-04-21|George Orwell
-BC003|978-0-7432-7357-2|The Great Gatsby|Classic|Scribner|English|180|12.99|PAPERBACK|AVAILABLE|false|2026-04-21|2026-04-21|F. Scott Fitzgerald
-BC4|0004|Dune|Sci-Fi|Unknown|English|0|24.99|HARDCOVER|AVAILABLE|false|2026-04-21|2026-04-21|
-BC5|0005|Python|Education|Unknown|English|0|5.99|HARDCOVER|AVAILABLE|false|2026-04-21|2026-04-21|
-BC6|0006|Berserk|Fantasy|Unknown|English|0|10.99|PAPERBACK|AVAILABLE|false|2026-04-21|2026-04-21|

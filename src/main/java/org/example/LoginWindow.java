@@ -75,6 +75,19 @@ public class LoginWindow {
                     LibrarianDashboard librarianDashboard = new LibrarianDashboard();
                     librarianDashboard.show(stage, loggedInUser);
                 } else {
+                    // create member in members table if not exists
+                    if (LibraryData.getInstance().findMemberByUsername(loggedInUser) == null) {
+                        Person person = new Person(loggedInUser, "", "", null);
+                        Member member = new Member(
+                                loggedInUser,
+                                password,
+                                AccountStatus.ACTIVE,
+                                person,
+                                new java.util.Date()
+                        );
+                        LibraryData.getInstance().addMember(member);
+                        System.out.println("Member created in DB: " + loggedInUser);
+                    }
                     MemberDashboard memberDashboard = new MemberDashboard();
                     memberDashboard.show(stage, loggedInUser);
                 }

@@ -13,12 +13,11 @@ import javafx.stage.Stage;
 public class MemberDashboard {
 
     private String loggedInUsername;
-    public void show(Stage stage, String username) {
 
+    public void show(Stage stage, String username) {
         this.loggedInUsername = username;
         stage.setTitle("Member Dashboard");
 
-        // ── Header ────────────────────────────────────────────
         Label titleLabel = new Label("Library Management System");
         titleLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
         titleLabel.setTextFill(Color.web("#1a1a2e"));
@@ -27,16 +26,15 @@ public class MemberDashboard {
         subtitleLabel.setFont(Font.font("Segoe UI", 14));
         subtitleLabel.setTextFill(Color.web("#6c757d"));
 
-        // ── Buttons ───────────────────────────────────────────
-        Button searchBtn = new Button("Search Catalog");
-        Button checkoutBtn = new Button("Checkout Book");
-        Button returnBtn = new Button("Return Book");
-        Button reserveBtn = new Button("Reserve Book");
-        Button renewBtn = new Button("Renew Book");
+        Button searchBtn           = new Button("Search Catalog");
+        Button checkoutBtn         = new Button("Checkout Book");
+        Button returnBtn           = new Button("Return Book");
+        Button reserveBtn          = new Button("Reserve Book");
+        Button renewBtn            = new Button("Renew Book");
         Button removeReservationBtn = new Button("Remove Reservation");
-        Button payFineBtn = new Button("Pay Fine");
-        Button viewAccountBtn = new Button("View Account");
-        Button logoutBtn = new Button("Log Out");
+        Button payFineBtn          = new Button("Pay Fine");
+        Button viewAccountBtn      = new Button("View Account");
+        Button logoutBtn           = new Button("Log Out");
 
         for (Button btn : new Button[]{searchBtn, checkoutBtn, returnBtn,
                 reserveBtn, renewBtn, removeReservationBtn,
@@ -45,7 +43,6 @@ public class MemberDashboard {
         }
         styleLogoutButton(logoutBtn);
 
-        // ── Button actions ────────────────────────────────────
         searchBtn.setOnAction(e -> showSearchDialog());
         checkoutBtn.setOnAction(e -> showCheckoutDialog());
         returnBtn.setOnAction(e -> showReturnDialog());
@@ -53,13 +50,12 @@ public class MemberDashboard {
         renewBtn.setOnAction(e -> showRenewDialog());
         removeReservationBtn.setOnAction(e -> showRemoveReservationDialog());
         payFineBtn.setOnAction(e -> showPayFineDialog());
-        viewAccountBtn.setOnAction(e -> showViewAccountDialog(username));
+        viewAccountBtn.setOnAction(e -> showViewAccountDialog());
         logoutBtn.setOnAction(e -> {
             LoginWindow loginWindow = new LoginWindow();
             loginWindow.show(stage);
         });
 
-        // ── Layout ────────────────────────────────────────────
         GridPane grid = new GridPane();
         grid.setHgap(12);
         grid.setVgap(12);
@@ -104,7 +100,7 @@ public class MemberDashboard {
         stage.show();
     }
 
-    // ── Dialogs ───────────────────────────────────────────────
+    // ── Search ────────────────────────────────────────────────
 
     private void showSearchDialog() {
         Stage dialog = new Stage();
@@ -118,7 +114,6 @@ public class MemberDashboard {
         TextField searchField = new TextField();
         searchField.setPromptText("Enter search term");
 
-        // results area
         TextArea resultArea = new TextArea();
         resultArea.setEditable(false);
         resultArea.setPrefHeight(200);
@@ -138,7 +133,6 @@ public class MemberDashboard {
                 errorLabel.setText("Please enter a search term.");
                 return;
             }
-
             errorLabel.setText("");
             Catalog catalog = LibraryData.getInstance().getCatalog();
             String result = "";
@@ -154,22 +148,17 @@ public class MemberDashboard {
                     result = catalog.searchBySubject(term);
                     break;
             }
-
             resultArea.setText(result);
         });
 
-        VBox layout = new VBox(12,
-                label, searchType,
-                searchField,
-                searchBtn,
-                errorLabel,
-                resultArea
-        );
+        VBox layout = new VBox(12, label, searchType, searchField, searchBtn, errorLabel, resultArea);
         layout.setPadding(new Insets(24));
 
-        dialog.setScene(new Scene(layout, 400, 440));
+        dialog.setScene(new Scene(layout, 400, 460));
         dialog.show();
     }
+
+    // ── Checkout ──────────────────────────────────────────────
 
     private void showCheckoutDialog() {
         Stage dialog = new Stage();
@@ -191,6 +180,13 @@ public class MemberDashboard {
             if (barcode.isEmpty()) {
                 resultLabel.setTextFill(Color.web("#dc3545"));
                 resultLabel.setText("Please enter a barcode.");
+                return;
+            }
+
+            // check unpaid fines first
+            if (FineManager.getInstance().hasUnpaidFines(loggedInUsername)) {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("You have unpaid fines! Please pay them before checking out.");
                 return;
             }
 
@@ -217,15 +213,21 @@ public class MemberDashboard {
                 resultLabel.setText("Checked out: " + book.getTitle() +
                         "\nBarcode: " + barcode +
                         "\nDue in 10 days.");
+            } else {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Checkout failed. Book may not be available.");
             }
+            barcodeField.clear();
         });
 
         VBox layout = new VBox(12, label, barcodeField, checkoutBtn, resultLabel);
         layout.setPadding(new Insets(24));
 
-        dialog.setScene(new Scene(layout, 340, 220));
+        dialog.setScene(new Scene(layout, 340, 240));
         dialog.show();
     }
+
+    // ── Return ────────────────────────────────────────────────
 
     private void showReturnDialog() {
         Stage dialog = new Stage();
@@ -233,7 +235,7 @@ public class MemberDashboard {
 
         Label label = new Label("Enter book barcode:");
         TextField barcodeField = new TextField();
-        barcodeField.setPromptText("Book barcode");
+        barcodeField.setPromptText("e.g. BC001");
 
         Label resultLabel = new Label();
         resultLabel.setWrapText(true);
@@ -250,14 +252,54 @@ public class MemberDashboard {
                 return;
             }
 
+            BookItem book = LibraryData.getInstance().findBookByBarcode(barcode);
+            if (book == null) {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Book not found with barcode: " + barcode);
+                return;
+            }
+
+            Member member = LibraryData.getInstance().findMemberByUsername(loggedInUsername);
+            if (member == null) {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Member account not found.");
+                return;
+            }
+
+            // calculate fine before returning
+            double fineAmount = LendingManager.getInstance()
+                    .calculateFine(barcode, loggedInUsername);
+
+            boolean success = member.returnBook(book);
+            if (success) {
+                LendingManager.getInstance().returnLending(barcode, loggedInUsername);
+                LibraryData.getInstance().updateBook(book);
+                LibraryData.getInstance().updateMember(member);
+
+                if (fineAmount > 0) {
+                    FineManager.getInstance().addFine(loggedInUsername, barcode, fineAmount);
+                    resultLabel.setTextFill(Color.web("#dc3545"));
+                    resultLabel.setText("Book returned but overdue!\nFine: $" + fineAmount +
+                            "\nPlease pay your fine.");
+                } else {
+                    resultLabel.setTextFill(Color.web("#198754"));
+                    resultLabel.setText("Book returned successfully: " + book.getTitle());
+                }
+            } else {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Return failed.");
+            }
+            barcodeField.clear();
         });
 
         VBox layout = new VBox(12, label, barcodeField, returnBtn, resultLabel);
         layout.setPadding(new Insets(24));
 
-        dialog.setScene(new Scene(layout, 340, 200));
+        dialog.setScene(new Scene(layout, 340, 240));
         dialog.show();
     }
+
+    // ── Reserve ───────────────────────────────────────────────
 
     private void showReserveDialog() {
         Stage dialog = new Stage();
@@ -265,7 +307,7 @@ public class MemberDashboard {
 
         Label label = new Label("Enter book barcode:");
         TextField barcodeField = new TextField();
-        barcodeField.setPromptText("Book barcode");
+        barcodeField.setPromptText("e.g. BC001");
 
         Label resultLabel = new Label();
         resultLabel.setWrapText(true);
@@ -281,17 +323,42 @@ public class MemberDashboard {
                 resultLabel.setText("Please enter a barcode.");
                 return;
             }
-            resultLabel.setTextFill(Color.web("#198754"));
-            resultLabel.setText("Book reserved successfully!");
+
+            BookItem book = LibraryData.getInstance().findBookByBarcode(barcode);
+            if (book == null) {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Book not found with barcode: " + barcode);
+                return;
+            }
+
+            Member member = LibraryData.getInstance().findMemberByUsername(loggedInUsername);
+            if (member == null) {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Member account not found.");
+                return;
+            }
+
+            boolean success = member.reserveBook(book);
+            if (success) {
+                ReservationManager.getInstance().addReservation(barcode, loggedInUsername);
+                LibraryData.getInstance().updateBook(book);
+                resultLabel.setTextFill(Color.web("#198754"));
+                resultLabel.setText("Book reserved: " + book.getTitle());
+            } else {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Reservation failed. Book may not be available.");
+            }
             barcodeField.clear();
         });
 
         VBox layout = new VBox(12, label, barcodeField, reserveBtn, resultLabel);
         layout.setPadding(new Insets(24));
 
-        dialog.setScene(new Scene(layout, 340, 200));
+        dialog.setScene(new Scene(layout, 340, 220));
         dialog.show();
     }
+
+    // ── Renew ─────────────────────────────────────────────────
 
     private void showRenewDialog() {
         Stage dialog = new Stage();
@@ -299,7 +366,7 @@ public class MemberDashboard {
 
         Label label = new Label("Enter book barcode:");
         TextField barcodeField = new TextField();
-        barcodeField.setPromptText("Book barcode");
+        barcodeField.setPromptText("e.g. BC001");
 
         Label resultLabel = new Label();
         resultLabel.setWrapText(true);
@@ -315,17 +382,60 @@ public class MemberDashboard {
                 resultLabel.setText("Please enter a barcode.");
                 return;
             }
-            resultLabel.setTextFill(Color.web("#198754"));
-            resultLabel.setText("Book renewed successfully!");
+
+            BookItem book = LibraryData.getInstance().findBookByBarcode(barcode);
+            if (book == null) {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Book not found with barcode: " + barcode);
+                return;
+            }
+
+            Member member = LibraryData.getInstance().findMemberByUsername(loggedInUsername);
+            if (member == null) {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Member account not found.");
+                return;
+            }
+
+            // check if reserved by another member
+            if (ReservationManager.getInstance().hasActiveReservation(barcode)) {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Cannot renew — book is reserved by another member!");
+                return;
+            }
+
+            // check fine before renewing
+            double fineAmount = LendingManager.getInstance()
+                    .calculateFine(barcode, loggedInUsername);
+            if (fineAmount > 0) {
+                FineManager.getInstance().addFine(loggedInUsername, barcode, fineAmount);
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Overdue fine: $" + fineAmount +
+                        "\nPlease pay your fine before renewing.");
+                return;
+            }
+
+            boolean success = member.renewBook(book);
+            if (success) {
+                LibraryData.getInstance().updateBook(book);
+                resultLabel.setTextFill(Color.web("#198754"));
+                resultLabel.setText("Book renewed: " + book.getTitle() +
+                        "\nNew due date extended by 10 days.");
+            } else {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Renewal failed.");
+            }
             barcodeField.clear();
         });
 
         VBox layout = new VBox(12, label, barcodeField, renewBtn, resultLabel);
         layout.setPadding(new Insets(24));
 
-        dialog.setScene(new Scene(layout, 340, 200));
+        dialog.setScene(new Scene(layout, 340, 240));
         dialog.show();
     }
+
+    // ── Remove Reservation ────────────────────────────────────
 
     private void showRemoveReservationDialog() {
         Stage dialog = new Stage();
@@ -333,7 +443,7 @@ public class MemberDashboard {
 
         Label label = new Label("Enter book barcode:");
         TextField barcodeField = new TextField();
-        barcodeField.setPromptText("Book barcode");
+        barcodeField.setPromptText("e.g. BC001");
 
         Label resultLabel = new Label();
         resultLabel.setWrapText(true);
@@ -349,25 +459,53 @@ public class MemberDashboard {
                 resultLabel.setText("Please enter a barcode.");
                 return;
             }
-            resultLabel.setTextFill(Color.web("#198754"));
-            resultLabel.setText("Reservation removed successfully!");
+
+            BookItem book = LibraryData.getInstance().findBookByBarcode(barcode);
+            if (book == null) {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("Book not found with barcode: " + barcode);
+                return;
+            }
+
+            boolean success = ReservationManager.getInstance()
+                    .cancelReservation(barcode, loggedInUsername);
+            if (success) {
+                book.setStatus(BookStatus.AVAILABLE);
+                LibraryData.getInstance().updateBook(book);
+                resultLabel.setTextFill(Color.web("#198754"));
+                resultLabel.setText("Reservation canceled for: " + book.getTitle());
+            } else {
+                resultLabel.setTextFill(Color.web("#dc3545"));
+                resultLabel.setText("No active reservation found for this book.");
+            }
             barcodeField.clear();
         });
 
         VBox layout = new VBox(12, label, barcodeField, removeBtn, resultLabel);
         layout.setPadding(new Insets(24));
 
-        dialog.setScene(new Scene(layout, 340, 200));
+        dialog.setScene(new Scene(layout, 340, 220));
         dialog.show();
     }
+
+    // ── Pay Fine ──────────────────────────────────────────────
 
     private void showPayFineDialog() {
         Stage dialog = new Stage();
         dialog.setTitle("Pay Fine");
 
-        Label label = new Label("Enter fine amount:");
-        TextField fineField = new TextField();
-        fineField.setPromptText("Amount in $");
+        // show total unpaid fines first
+        double totalFine = FineManager.getInstance()
+                .getTotalUnpaidAmount(loggedInUsername);
+
+        Label totalLabel = new Label("Total unpaid fines: $" + totalFine);
+        totalLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
+        totalLabel.setTextFill(totalFine > 0 ?
+                Color.web("#dc3545") : Color.web("#198754"));
+
+        Label label = new Label("Enter book barcode to pay fine for:");
+        TextField barcodeField = new TextField();
+        barcodeField.setPromptText("e.g. BC001");
 
         Label resultLabel = new Label();
         resultLabel.setWrapText(true);
@@ -377,53 +515,117 @@ public class MemberDashboard {
         payBtn.setPrefWidth(Double.MAX_VALUE);
 
         payBtn.setOnAction(e -> {
-            String amount = fineField.getText().trim();
-            if (amount.isEmpty()) {
+            String barcode = barcodeField.getText().trim();
+            if (barcode.isEmpty()) {
                 resultLabel.setTextFill(Color.web("#dc3545"));
-                resultLabel.setText("Please enter an amount.");
+                resultLabel.setText("Please enter a barcode.");
                 return;
             }
-            try {
-                double fine = Double.parseDouble(amount);
+
+            boolean success = FineManager.getInstance()
+                    .payFine(loggedInUsername, barcode);
+            if (success) {
+                double remaining = FineManager.getInstance()
+                        .getTotalUnpaidAmount(loggedInUsername);
                 resultLabel.setTextFill(Color.web("#198754"));
-                resultLabel.setText("Fine of $" + fine + " paid successfully!");
-                fineField.clear();
-            } catch (NumberFormatException ex) {
+                resultLabel.setText("Fine paid successfully!\nRemaining fines: $" + remaining);
+                totalLabel.setText("Total unpaid fines: $" + remaining);
+                totalLabel.setTextFill(remaining > 0 ?
+                        Color.web("#dc3545") : Color.web("#198754"));
+            } else {
                 resultLabel.setTextFill(Color.web("#dc3545"));
-                resultLabel.setText("Invalid amount.");
+                resultLabel.setText("No unpaid fine found for this barcode.");
             }
+            barcodeField.clear();
         });
 
-        VBox layout = new VBox(12, label, fineField, payBtn, resultLabel);
+        VBox layout = new VBox(12, totalLabel, label, barcodeField, payBtn, resultLabel);
         layout.setPadding(new Insets(24));
 
-        dialog.setScene(new Scene(layout, 340, 200));
+        dialog.setScene(new Scene(layout, 360, 260));
         dialog.show();
     }
 
-    private void showViewAccountDialog(String username) {
-        Stage dialog = new Stage();
-        dialog.setTitle("View Account");
+    // ── View Account ──────────────────────────────────────────
 
-        Label nameLabel = new Label("Username: " + username);
-        nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 14));
+    private void showViewAccountDialog() {
+        Stage dialog = new Stage();
+        dialog.setTitle("My Account");
+
+        Member member = LibraryData.getInstance().findMemberByUsername(loggedInUsername);
+
+        Label nameLabel = new Label("Username: " + loggedInUsername);
+        nameLabel.setFont(Font.font("Segoe UI", FontWeight.BOLD, 15));
 
         Label roleLabel = new Label("Role: Member");
-        roleLabel.setFont(Font.font("Segoe UI", 13));
         roleLabel.setTextFill(Color.web("#6c757d"));
 
-        Label booksLabel = new Label("Books checked out: 0");
-        booksLabel.setFont(Font.font("Segoe UI", 13));
+        Label statusLabel = new Label("Status: " +
+                (member != null ? member.getStatus() : "ACTIVE"));
+        statusLabel.setTextFill(Color.web("#6c757d"));
+
+        Label booksLabel = new Label("Books checked out: " +
+                (member != null ? member.getTotalBooksCheckedOut() : 0));
+
+        double totalFine = FineManager.getInstance().getTotalUnpaidAmount(loggedInUsername);
+        Label fineLabel = new Label("Unpaid fines: $" + totalFine);
+        fineLabel.setTextFill(totalFine > 0 ?
+                Color.web("#dc3545") : Color.web("#198754"));
+
+        // show active lendings
+        Label lendingsTitle = new Label("Active lendings:");
+        lendingsTitle.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 13));
+
+        TextArea lendingsArea = new TextArea();
+        lendingsArea.setEditable(false);
+        lendingsArea.setPrefHeight(120);
+        lendingsArea.setWrapText(true);
+
+        StringBuilder lendingsText = new StringBuilder();
+        for (String[] record : LendingManager.getInstance()
+                .getLendingsForUser(loggedInUsername)) {
+            if (record[4].equals("null") || record[4].equals("Not returned")) {
+                lendingsText.append("Barcode: ").append(record[0])
+                        .append(" | Due: ").append(record[3]).append("\n");
+            }
+        }
+        lendingsArea.setText(lendingsText.length() > 0 ?
+                lendingsText.toString() : "No active lendings.");
+
+        // show active reservations
+        Label reservationsTitle = new Label("Active reservations:");
+        reservationsTitle.setFont(Font.font("Segoe UI", FontWeight.SEMI_BOLD, 13));
+
+        TextArea reservationsArea = new TextArea();
+        reservationsArea.setEditable(false);
+        reservationsArea.setPrefHeight(100);
+        reservationsArea.setWrapText(true);
+
+        StringBuilder reservationsText = new StringBuilder();
+        for (String[] record : ReservationManager.getInstance()
+                .getReservationsForUser(loggedInUsername)) {
+            if (record[3].equals(ReservationStatus.WAITING.toString())) {
+                reservationsText.append("Barcode: ").append(record[0])
+                        .append(" | Date: ").append(record[2]).append("\n");
+            }
+        }
+        reservationsArea.setText(reservationsText.length() > 0 ?
+                reservationsText.toString() : "No active reservations.");
 
         Button closeBtn = new Button("Close");
         stylePrimaryButton(closeBtn);
         closeBtn.setPrefWidth(Double.MAX_VALUE);
         closeBtn.setOnAction(e -> dialog.close());
 
-        VBox layout = new VBox(14, nameLabel, roleLabel, booksLabel, closeBtn);
+        VBox layout = new VBox(10,
+                nameLabel, roleLabel, statusLabel, booksLabel, fineLabel,
+                lendingsTitle, lendingsArea,
+                reservationsTitle, reservationsArea,
+                closeBtn
+        );
         layout.setPadding(new Insets(24));
 
-        dialog.setScene(new Scene(layout, 300, 200));
+        dialog.setScene(new Scene(layout, 380, 560));
         dialog.show();
     }
 
